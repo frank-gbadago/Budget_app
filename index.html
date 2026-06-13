@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Daily Financial Splitter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans min-h-screen pb-10">
+
+    <!-- Update notification banner (hidden by default) -->
+    <div id="update-banner" style="display:none;background:#1d4ed8;color:white;text-align:center;padding:10px 16px;font-size:13px;font-weight:600;position:relative;z-index:100;">
+        <i class="fa-solid fa-rotate" style="margin-right:6px;"></i>
+        A new version of this app is available!
+        <a id="update-download-link" href="#" download style="color:#fde68a;margin-left:10px;text-decoration:underline;font-weight:700;">
+            Click here to download the update
+        </a>
+        <button onclick="document.getElementById('update-banner').style.display='none'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:white;font-size:16px;cursor:pointer;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <header class="bg-blue-600 text-white shadow-md p-4 mb-6">
+        <div class="max-w-4xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-wallet"></i> Intelligent Budget Tracker
+            </h1>
+            
+            <div class="bg-blue-700 p-2 rounded-lg border border-blue-500 text-xs flex items-center gap-2">
+                <span class="font-bold uppercase tracking-wider text-blue-200">Rules (%):</span>
+                <div class="flex items-center gap-1 text-gray-800">
+                    <input type="number" id="pctSpending" value="50" class="w-10 p-1 text-center font-bold rounded" title="Spending Fund %">
+                    <input type="number" id="pctSavings" value="30" class="w-10 p-1 text-center font-bold rounded" title="Savings & Invest %">
+                    <input type="number" id="pctNeeds" value="20" class="w-10 p-1 text-center font-bold rounded" title="Needs %">
+                </div>
+                <button onclick="updatePercentages()" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 font-bold rounded transition">
+                    Update Rule
+                </button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-2 border border-blue-500 transition">
+                    <i class="fa-solid fa-file-arrow-down"></i> Backup
+                </button>
+                <button onclick="document.getElementById('importFileInput').click()" class="bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-2 border border-blue-500 transition">
+                    <i class="fa-solid fa-file-arrow-up"></i> Restore
+                </button>
+                <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importData(event)">
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <section class="md:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-200 h-fit space-y-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-arrows-split-up-and-left text-blue-500"></i> Split New Income
+            </h2>
+            <p class="text-xs text-gray-500 leading-relaxed">Use this when you get general money that you want split automatically according to your dynamic rules above.</p>
+            
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Amount (GHS)</label>
+                <input type="number" id="incomeInput" placeholder="0.00" step="0.01" min="0"
+                    class="w-full text-lg px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-gray-700">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Received Via</label>
+                <select id="incomeLocation" class="w-full text-sm px-3 py-2.5 border border-gray-300 rounded-lg bg-gray-50 font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="momo">Momo / Bank Account</option>
+                    <option value="cash">Physical Cash</option>
+                </select>
+            </div>
+
+            <button onclick="processIncome()" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-sm">
+                Split Money
+            </button>
+            
+            <div class="pt-4 border-t border-gray-100">
+                <button onclick="clearAllData()" class="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 opacity-70 hover:opacity-100 transition">
+                    <i class="fa-solid fa-trash-can"></i> Reset All Balances
+                </button>
+            </div>
+        </section>
+
+        <section class="md:col-span-2 space-y-6">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between">
+                    <div class="p-3 bg-orange-50 border-b border-orange-100 flex justify-between items-center">
+                        <span class="font-bold text-orange-800 text-xs">Spending Fund</span>
+                        <span id="lbl-spending-pct" class="text-[10px] font-bold bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded-full">50%</span>
+                    </div>
+                    <div class="p-4 flex-grow">
+                        <div class="text-xl font-black text-gray-800 mb-3">GHS <span id="val-spending">0.00</span></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="openAdjustmentModal('spending', 'add')" class="bg-green-50 hover:bg-green-100 text-green-700 text-[11px] font-bold py-1 px-2 rounded border border-green-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-plus-circle"></i> Add</button>
+                            <button onclick="openAdjustmentModal('spending', 'deduct')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold py-1 px-2 rounded border border-red-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-minus-circle"></i> Deduct</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between">
+                    <div class="p-3 bg-green-50 border-b border-green-100 flex justify-between items-center">
+                        <span class="font-bold text-green-800 text-xs">Savings & Invest</span>
+                        <span id="lbl-savings-pct" class="text-[10px] font-bold bg-green-200 text-green-800 px-1.5 py-0.5 rounded-full">30%</span>
+                    </div>
+                    <div class="p-4 flex-grow">
+                        <div class="text-xl font-black text-gray-800 mb-3">GHS <span id="val-savings">0.00</span></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="openAdjustmentModal('savings', 'add')" class="bg-green-50 hover:bg-green-100 text-green-700 text-[11px] font-bold py-1 px-2 rounded border border-green-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-plus-circle"></i> Profit / Add</button>
+                            <button onclick="openAdjustmentModal('savings', 'deduct')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold py-1 px-2 rounded border border-red-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-minus-circle"></i> Deduct</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between">
+                    <div class="p-3 bg-purple-50 border-b border-purple-100 flex justify-between items-center">
+                        <span class="font-bold text-purple-800 text-xs">Needs</span>
+                        <span id="lbl-needs-pct" class="text-[10px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded-full">20%</span>
+                    </div>
+                    <div class="p-4 flex-grow">
+                        <div class="text-xl font-black text-gray-800 mb-3">GHS <span id="val-needs">0.00</span></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="openAdjustmentModal('needs', 'add')" class="bg-green-50 hover:bg-green-100 text-green-700 text-[11px] font-bold py-1 px-2 rounded border border-green-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-plus-circle"></i> Add</button>
+                            <button onclick="openAdjustmentModal('needs', 'deduct')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold py-1 px-2 rounded border border-red-200 flex items-center justify-center gap-1 transition"><i class="fa-solid fa-minus-circle"></i> Deduct</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="bg-slate-800 text-white p-4 rounded-xl shadow-md">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-building-columns"></i> Where My Money Physically Is (Actual Wallets)
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                        <div class="text-xs text-slate-300 font-medium">Momo / Bank Account Balance</div>
+                        <div class="text-xl font-bold text-cyan-400 mt-1">GHS <span id="val-momo">0.00</span></div>
+                    </div>
+                    <div class="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                        <div class="text-xs text-slate-300 font-medium">Physical Cash in Hand</div>
+                        <div class="text-xl font-bold text-amber-400 mt-1">GHS <span id="val-cash">0.00</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-gray-500"></i> Transaction Log
+                </h3>
+                <div id="historyLog" class="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs text-gray-500">
+                    <p class="text-center py-4 italic">No transactions recorded yet.</p>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <div id="adjustModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 transform transition-all scale-95 duration-200">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <i id="modalIcon" class="fa-solid fa-calculator"></i> <span id="modalActionTitle">Adjust</span> Funds
+                </h3>
+                <button onclick="closeAdjustmentModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-gray-500 mb-3"><span id="modalActionDesc">Modify</span> your <span id="modalTargetName" class="font-bold text-gray-700"></span> allocation.</p>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Amount (GHS)</label>
+                    <input type="number" id="adjustInput" placeholder="0.00" step="0.01" min="0"
+                        class="w-full text-base px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 font-semibold text-gray-700">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Description / Purpose <span style="color:red;">*</span></label>
+                    <input type="text" id="adjustDescription" placeholder="e.g. Bought food, Transport, School fees..."
+                        class="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Physical Account Location</label>
+                    <select id="adjustLocation" class="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="momo">Momo / Bank Account</option>
+                        <option value="cash">Physical Cash Balance</option>
+                    </select>
+                </div>
+
+                <button onclick="submitAdjustment()" id="modalSubmitBtn"
+                    class="w-full text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-sm text-sm mt-2">
+                    Confirm Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // App State Matrix
+        let rules = { spending: 50, savings: 30, needs: 20 };
+        let balances = { spending: 0, savings: 0, needs: 0 };
+        let wallets = { momo: 0, cash: 0 };
+        let history = [];
+        
+        let activeTargetBucket = '';
+        let activeMode = ''; // 'add' or 'deduct'
+
+        // Startup Boot Routine
+        window.onload = function() {
+            if(localStorage.getItem('v3_rules')) {
+                rules = JSON.parse(localStorage.getItem('v3_rules'));
+            }
+            if(localStorage.getItem('v3_balances')) {
+                balances = JSON.parse(localStorage.getItem('v3_balances'));
+            }
+            if(localStorage.getItem('v3_wallets')) {
+                wallets = JSON.parse(localStorage.getItem('v3_wallets'));
+            }
+            if(localStorage.getItem('v3_history')) {
+                history = JSON.parse(localStorage.getItem('v3_history'));
+            }
+            
+            // Populate config controls to match current state
+            document.getElementById('pctSpending').value = rules.spending;
+            document.getElementById('pctSavings').value = rules.savings;
+            document.getElementById('pctNeeds').value = rules.needs;
+            
+            updateUI();
+        }
+
+        // Feature Action 1: Mutating Percentage Configurations Dynamically
+        function updatePercentages() {
+            const sp = parseInt(document.getElementById('pctSpending').value) || 0;
+            const sa = parseInt(document.getElementById('pctSavings').value) || 0;
+            const ne = parseInt(document.getElementById('pctNeeds').value) || 0;
+
+            if ((sp + sa + ne) !== 100) {
+                alert(`Error: Your custom rules add up to ${sp + sa + ne}%. They must add up to exactly 100%. Please check your math.`);
+                return;
+            }
+
+            rules.spending = sp;
+            rules.savings = sa;
+            rules.needs = ne;
+
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            history.unshift({
+                type: 'income',
+                text: `Split logic updated to ${sp}/${sa}/${ne} (${timestamp})`,
+                details: 'Future manual income entries will divide using this updated profile allocation.'
+            });
+
+            saveState();
+            updateUI();
+            alert(`Split rules successfully updated to ${sp}% / ${sa}% / ${ne}%!`);
+        }
+
+        // Processing Standard Splitting Transactions
+        function processIncome() {
+            const inputField = document.getElementById('incomeInput');
+            const locationField = document.getElementById('incomeLocation');
+            const amount = parseFloat(inputField.value);
+            const location = locationField.value; 
+
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid incoming amount.");
+                return;
+            }
+
+            // Calculations based on modern customized state configurations
+            const splitSpending = amount * (rules.spending / 100);
+            const splitSavings = amount * (rules.savings / 100);
+            const splitNeeds = amount * (rules.needs / 100);
+
+            // Mutate balances
+            balances.spending += splitSpending;
+            balances.savings += splitSavings;
+            balances.needs += splitNeeds;
+
+            // Mutate wallet tracking positions
+            wallets[location] += amount;
+
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const locName = location === 'momo' ? 'MoMo/Bank' : 'Cash';
+            
+            const splitNow  = new Date();
+            const splitDate = splitNow.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) + ' at ' + splitNow.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            history.unshift({
+                type:        'income',
+                date:        splitDate,
+                wallet:      locName,
+                amount:      amount,
+                description: 'Income split',
+                text:        'Split +GHS ' + amount.toFixed(2) + ' into ' + locName + ' on ' + splitDate,
+                details:     'Allocated ' + rules.spending + '/' + rules.savings + '/' + rules.needs + '%: Spending (+GHS ' + splitSpending.toFixed(2) + '), Savings (+GHS ' + splitSavings.toFixed(2) + '), Needs (+GHS ' + splitNeeds.toFixed(2) + ')'
+            });
+
+            saveState();
+            updateUI();
+            inputField.value = '';
+        }
+
+        // Feature Action 2: Multi-mode Adjustment Modal Configuration
+        function openAdjustmentModal(targetBucket, mode) {
+            activeTargetBucket = targetBucket;
+            activeMode = mode;
+            
+            const displayNames = { spending: 'Spending Fund', savings: 'Savings & Invest', needs: 'Needs' };
+            document.getElementById('modalTargetName').innerText = displayNames[targetBucket];
+            
+            const modalIcon = document.getElementById('modalIcon');
+            const submitBtn = document.getElementById('modalSubmitBtn');
+            const inputField = document.getElementById('adjustInput');
+
+            if(mode === 'add') {
+                document.getElementById('modalActionTitle').innerText = "Add Profit / Funds";
+                document.getElementById('modalActionDesc').innerText = "Directly inject standalone profits or specialized returns into your";
+                modalIcon.className = "fa-solid fa-circle-plus text-green-500";
+                submitBtn.className = "w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-sm text-sm mt-2";
+                inputField.className = "w-full text-base px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 font-semibold text-gray-700";
+            } else {
+                document.getElementById('modalActionTitle').innerText = "Deduct Funds";
+                document.getElementById('modalActionDesc').innerText = "Subtract immediate charges or deductions out of your";
+                modalIcon.className = "fa-solid fa-circle-minus text-red-500";
+                submitBtn.className = "w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex justify-center items-center gap-2 shadow-sm text-sm mt-2";
+                inputField.className = "w-full text-base px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 font-semibold text-gray-700";
+            }
+
+            document.getElementById('adjustModal').classList.remove('hidden');
+            inputField.focus();
+        }
+
+        function closeAdjustmentModal() {
+            document.getElementById('adjustModal').classList.add('hidden');
+            document.getElementById('adjustInput').value = '';
+            document.getElementById('adjustDescription').value = '';
+            activeTargetBucket = '';
+            activeMode = '';
+        }
+
+        function submitAdjustment() {
+            const inputField       = document.getElementById('adjustInput');
+            const locationField    = document.getElementById('adjustLocation');
+            const descField        = document.getElementById('adjustDescription');
+            const amount           = parseFloat(inputField.value);
+            const selectedWallet   = locationField.value;
+            const description      = descField.value.trim();
+
+            const displayNames = { spending: 'Spending Fund', savings: 'Savings & Invest', needs: 'Needs' };
+            const locNames     = { momo: 'MoMo/Bank', cash: 'Cash' };
+
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount.');
+                return;
+            }
+
+            // Description required for deductions
+            if (activeMode === 'deduct' && !description) {
+                alert('Please enter a description for this deduction (e.g. Bought food, Transport...)');
+                descField.focus();
+                return;
+            }
+
+            const now       = new Date();
+            const dateStr   = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+            const timeStr   = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const timestamp = dateStr + ' at ' + timeStr;
+
+            if (activeMode === 'add') {
+                balances[activeTargetBucket] += amount;
+                wallets[selectedWallet]      += amount;
+                history.unshift({
+                    type:        'income',
+                    date:        timestamp,
+                    bucket:      displayNames[activeTargetBucket],
+                    wallet:      locNames[selectedWallet],
+                    amount:      amount,
+                    description: description || 'Funds added',
+                    text:        'Added +GHS ' + amount.toFixed(2) + ' to ' + displayNames[activeTargetBucket] + ' via ' + locNames[selectedWallet]
+                });
+            } else {
+                balances[activeTargetBucket] -= amount;
+                wallets[selectedWallet]      -= amount;
+                history.unshift({
+                    type:        'deduction',
+                    date:        timestamp,
+                    bucket:      displayNames[activeTargetBucket],
+                    wallet:      locNames[selectedWallet],
+                    amount:      amount,
+                    description: description,
+                    text:        'Deducted -GHS ' + amount.toFixed(2) + ' from ' + displayNames[activeTargetBucket] + ' via ' + locNames[selectedWallet]
+                });
+            }
+
+            saveState();
+            updateUI();
+            closeAdjustmentModal();
+        }
+
+        // Engine Persistence Sync
+        function saveState() {
+            localStorage.setItem('v3_rules', JSON.stringify(rules));
+            localStorage.setItem('v3_balances', JSON.stringify(balances));
+            localStorage.setItem('v3_wallets', JSON.stringify(wallets));
+            localStorage.setItem('v3_history', JSON.stringify(history));
+        }
+
+        // Render Refresh Matrix
+        function updateUI() {
+            // Update percentage card label displays dynamically
+            document.getElementById('lbl-spending-pct').innerText = `${rules.spending}%`;
+            document.getElementById('lbl-savings-pct').innerText = `${rules.savings}%`;
+            document.getElementById('lbl-needs-pct').innerText = `${rules.needs}%`;
+
+            // Repaint allocation balances
+            document.getElementById('val-spending').innerText = balances.spending.toFixed(2);
+            document.getElementById('val-savings').innerText = balances.savings.toFixed(2);
+            document.getElementById('val-needs').innerText = balances.needs.toFixed(2);
+
+            // Repaint tracking wallets
+            document.getElementById('val-momo').innerText = wallets.momo.toFixed(2);
+            document.getElementById('val-cash').innerText = wallets.cash.toFixed(2);
+
+            // Redraw History
+            const logContainer = document.getElementById('historyLog');
+            if (history.length === 0) {
+                logContainer.innerHTML = `<p class="text-center py-4 italic">No transactions recorded yet.</p>`;
+                return;
+            }
+
+            logContainer.innerHTML = history.map(function(item) {
+                var dateTag = item.date ? '<span style="float:right;font-size:10px;color:#6b7280;font-weight:400;">' + item.date + '</span>' : '';
+                if (item.type === 'income') {
+                    var detailLine = item.details ? '<div style="font-size:11px;color:#15803d;margin-top:3px;">' + item.details + '</div>' : '';
+                    var descLine   = (item.description && item.description !== 'Income split') ? '<div style="font-size:11px;color:#166534;margin-top:2px;"><i class="fa-solid fa-tag"></i> ' + item.description + '</div>' : '';
+                    return '<div style="padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:4px;">' +
+                        '<div style="font-weight:700;font-size:12px;color:#14532d;display:flex;align-items:center;gap:5px;">' +
+                        '<i class="fa-solid fa-circle-arrow-up" style="color:#16a34a;"></i>' + item.text + dateTag + '</div>' +
+                        descLine + detailLine + '</div>';
+                } else {
+                    return '<div style="padding:8px 10px;background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;margin-bottom:4px;">' +
+                        '<div style="font-weight:700;font-size:12px;color:#7f1d1d;display:flex;align-items:center;gap:5px;">' +
+                        '<i class="fa-solid fa-circle-arrow-down" style="color:#dc2626;"></i>' + item.text + dateTag + '</div>' +
+                        (item.description ? '<div style="font-size:11px;color:#991b1b;margin-top:3px;"><i class="fa-solid fa-tag"></i> Purpose: <strong>' + item.description + '</strong></div>' : '') +
+                        (item.bucket ? '<div style="font-size:10px;color:#b91c1c;margin-top:2px;">From: ' + item.bucket + ' &bull; Via: ' + (item.wallet||'') + '</div>' : '') +
+                        '</div>';
+                }
+            }).join('');
+        }
+
+        function clearAllData() {
+            if(confirm('Completely reset everything? This clears all balances, history and settings.')) {
+                localStorage.clear();
+                rules    = { spending: 50, savings: 30, needs: 20 };
+                balances = { spending: 0, savings: 0, needs: 0 };
+                wallets  = { momo: 0, cash: 0 };
+                history  = [];
+                document.getElementById('pctSpending').value = 50;
+                document.getElementById('pctSavings').value  = 30;
+                document.getElementById('pctNeeds').value    = 20;
+                updateUI();
+            }
+        }
+
+        // ── EXPORT: Save all data as a .json backup file ──────────────────────
+        function exportData() {
+            var data = {
+                exportedAt: new Date().toISOString(),
+                appVersion: 'budget_v3',
+                rules:      rules,
+                balances:   balances,
+                wallets:    wallets,
+                history:    history
+            };
+            var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            var date = new Date().toISOString().slice(0,10);
+            a.href     = url;
+            a.download = 'budget-backup-' + date + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ── IMPORT: Load a .json backup file and restore all data ─────────────
+        function importData(event) {
+            var file = event.target.files[0];
+            if (!file) return;
+            if (!file.name.endsWith('.json')) {
+                alert('Please select a .json backup file.');
+                event.target.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var imported = JSON.parse(e.target.result);
+
+                    // Accept both wrapped and raw formats
+                    var data = (imported.appVersion === 'budget_v3' || imported.rules) ? imported : null;
+                    if (!data || !data.rules || !data.balances || !data.wallets) {
+                        alert('This does not appear to be a valid Budget backup file.');
+                        event.target.value = '';
+                        return;
+                    }
+
+                    if (!confirm('This will replace ALL your current data with the backup from ' + (data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'unknown date') + '. Continue?')) {
+                        event.target.value = '';
+                        return;
+                    }
+
+                    rules    = data.rules;
+                    balances = data.balances;
+                    wallets  = data.wallets;
+                    history  = data.history || [];
+
+                    document.getElementById('pctSpending').value = rules.spending;
+                    document.getElementById('pctSavings').value  = rules.savings;
+                    document.getElementById('pctNeeds').value    = rules.needs;
+
+                    saveState();
+                    updateUI();
+                    alert('Backup restored successfully! ' + history.length + ' transactions loaded.');
+                } catch(err) {
+                    alert('Could not read the backup file. Error: ' + err.message);
+                }
+                event.target.value = '';
+            };
+            reader.onerror = function() { alert('Could not read the file.'); event.target.value = ''; };
+            reader.readAsText(file);
+        }
+
+        // ── APP VERSION & UPDATE CHECKER ─────────────────────────────────────
+        // IMPORTANT: Every time you update the app, increase this number by 0.1
+        // e.g. 1.0 -> 1.1 -> 1.2 etc.
+        var APP_VERSION = 1.0;
+
+        // IMPORTANT: Replace this URL with your actual GitHub raw file URL
+        // It should look like:
+        // https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/index.html
+        // or wherever you host the Budget.html file on GitHub
+        var VERSION_CHECK_URL = 'YOUR_GITHUB_RAW_URL_HERE';
+
+        function checkForUpdate() {
+            // Only check if a valid GitHub URL has been set
+            if (!VERSION_CHECK_URL || VERSION_CHECK_URL.indexOf('YOUR_GITHUB') !== -1) return;
+
+            fetch(VERSION_CHECK_URL + '?nocache=' + Date.now())
+                .then(function(response) { return response.text(); })
+                .then(function(text) {
+                    // Extract the version number from the fetched file
+                    var match = text.match(/APP_VERSION\s*=\s*([\d.]+)/);
+                    if (!match) return;
+                    var latestVersion = parseFloat(match[1]);
+
+                    if (latestVersion > APP_VERSION) {
+                        // Newer version found — show the update banner
+                        var banner = document.getElementById('update-banner');
+                        var link   = document.getElementById('update-download-link');
+                        link.href  = VERSION_CHECK_URL;
+                        link.download = 'Budget-v' + latestVersion + '.html';
+                        banner.style.display = 'block';
+                    }
+                })
+                .catch(function() {
+                    // Silently fail if offline or URL unreachable
+                });
+        }
+
+        // Run update check 3 seconds after page loads (non-blocking)
+        setTimeout(checkForUpdate, 3000);
+
+    </script>
+</body>
+</html>
